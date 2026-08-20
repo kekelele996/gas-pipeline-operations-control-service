@@ -103,7 +103,7 @@ func (s *Service) ListByShipper(ctx context.Context, shipperID string) []Contrac
 func (s *Service) Remaining(ctx context.Context, id string) (float64, error) {
 	c, ok := s.store.Get(id)
 	if !ok {
-		return 0, fmt.Errorf("contract %q not found", id)
+		return 0, platform.NotFoundf("contract %q not found", id)
 	}
 	return c.Remaining(), nil
 }
@@ -113,11 +113,11 @@ func (s *Service) Remaining(ctx context.Context, id string) (float64, error) {
 // capacity. The reservation is atomic per contract.
 func (s *Service) Reserve(ctx context.Context, id string, amount float64) (Contract, error) {
 	if amount <= 0 {
-		return Contract{}, fmt.Errorf("reserve amount must be positive")
+		return Contract{}, platform.Invalidf("reserve amount must be positive")
 	}
 	out, err := s.store.ReserveAtomically(id, amount, s.clock.Now())
 	if err != nil {
-		return out, fmt.Errorf("capacity reservation failed: %v", err)
+		return out, fmt.Errorf("capacity reservation failed: %w", err)
 	}
 	if s.audit != nil {
 		_ = s.audit.Record(ctx, "nomination", "reserve_capacity", "contract", id,
@@ -133,7 +133,7 @@ func (s *Service) Release(ctx context.Context, id string, amount float64) (Contr
 		return Contract{}, platform.Invalidf("release amount must be positive")
 	}
 	if _, ok := s.store.Get(id); !ok {
-		return Contract{}, fmt.Errorf("contract %q not found", id)
+		return Contract{}, platform.NotFoundf("contract %q not found", id)
 	}
 	out, _ := s.store.Update(id, func(x *Contract) {
 		x.UsedVolume -= amount
