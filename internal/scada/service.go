@@ -278,7 +278,11 @@ func (s *Service) makeAlarm(r Rule, level AlarmLevel, rd Reading, msg string) Al
 
 // History returns the recent readings for a point (deep-copied snapshot).
 func (s *Service) History(ctx context.Context, pointID string, limit int) ([]Reading, error) {
-	hist := s.store.History(pointID)
+	r, ok := s.store.readings[pointID]
+	if !ok {
+		return nil, platform.NotFoundf("no readings for point %q", pointID)
+	}
+	hist := r.buf
 	if limit > 0 && len(hist) > limit {
 		hist = hist[len(hist)-limit:]
 	}
@@ -367,9 +371,8 @@ func (t *ruleTable) list(pointID string) []Rule {
 		}
 		return all
 	}
-	out := make([]Rule, len(t.byPoint[pointID]))
-	copy(out, t.byPoint[pointID])
-	return out
+	// return the stored slice directly so rule lookups are allocation-free
+	return t.byPoint[pointID]
 }
 
 // now helper for explicit time usage
