@@ -88,14 +88,9 @@ func (s *Store) ForContractDate(contractID, date string) []Nomination {
 	ids := s.byContractDate[dateKey{contractID, date}]
 	out := make([]Nomination, 0, len(ids))
 	for _, id := range ids {
-		n, ok := s.items[id]
-		if !ok {
-			continue
+		if n, ok := s.items[id]; ok {
+			out = append(out, *n)
 		}
-		if n.State == StateHeld {
-			continue
-		}
-		out = append(out, *n)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
@@ -123,8 +118,8 @@ func (s *Store) Hold(id string) (Nomination, error) {
 	if err != nil {
 		return n, err
 	}
-	_, _ = s.Update(id, func(x *Nomination) { x.State = next })
-	return n, nil
+	out, _ := s.Update(id, func(x *Nomination) { x.State = next })
+	return out, nil
 }
 
 // ConfirmHeld moves a held nomination to confirmed.
@@ -137,8 +132,8 @@ func (s *Store) ConfirmHeld(id string) (Nomination, error) {
 	if err != nil {
 		return n, err
 	}
-	_, _ = s.Update(id, func(x *Nomination) { x.State = next })
-	return n, nil
+	out, _ := s.Update(id, func(x *Nomination) { x.State = next })
+	return out, nil
 }
 
 // CapacityUsed returns the total volume of nominations that currently hold
@@ -152,7 +147,7 @@ func (s *Store) CapacityUsed(contractID, date string) float64 {
 			continue
 		}
 		switch n.State {
-		case StateSubmitted, StateConfirmed:
+		case StateSubmitted, StateHeld, StateConfirmed:
 			used += n.Volume
 		}
 	}
