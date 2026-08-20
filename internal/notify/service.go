@@ -95,13 +95,10 @@ func (s *Service) PushBatch(ctx context.Context) (sent, failed int, err error) {
 	const workers = 4
 	jobs := make(chan Notification)
 	errCh := make(chan error, len(due))
-	start := make(chan struct{})
 	var wg sync.WaitGroup
 	for i := 0; i < workers; i++ {
+		wg.Add(1)
 		go func() {
-			<-start
-			time.Sleep(2 * time.Millisecond)
-			wg.Add(1)
 			defer wg.Done()
 			for n := range jobs {
 				errCh <- s.deliver(n)
@@ -110,25 +107,15 @@ func (s *Service) PushBatch(ctx context.Context) (sent, failed int, err error) {
 	}
 	// producer feeds jobs to the workers
 	go func() {
+		defer close(jobs)
 		for _, n := range due {
 			if ctx.Err() != nil {
 				return
 			}
 			jobs <- n
 		}
-		close(jobs)
 	}()
-	close(start)
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-	select {
-	case <-ctx.Done():
-		return sent, failed, ctx.Err()
-	case <-done:
-	}
+	wg.Wait()
 	close(errCh)
 	for e := range errCh {
 		if e != nil {
@@ -153,6 +140,11 @@ func (s *Service) deliver(n Notification) error {
 	}
 	attempt := n.Attempt + 1
 	if attempt >= n.MaxAttempts {
+		s.store.Update(n.ID, func(x *Notification) {
+			x.State = StateFailed
+			x.Attempt = attempt
+			x.LastError = "delivery failed (max attempts reached)"
+		})
 		return fmt.Errorf("delivery failed (max attempts reached)")
 	}
 	backoff := s.backoff(attempt)
