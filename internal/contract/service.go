@@ -115,20 +115,10 @@ func (s *Service) Reserve(ctx context.Context, id string, amount float64) (Contr
 	if amount <= 0 {
 		return Contract{}, platform.Invalidf("reserve amount must be positive")
 	}
-	cur, ok := s.store.Get(id)
-	if !ok {
-		return Contract{}, platform.NotFoundf("contract %q not found", id)
+	out, err := s.store.ReserveAtomically(id, amount, s.clock.Now())
+	if err != nil {
+		return out, err
 	}
-	if !cur.IsActiveNow(s.clock.Now()) {
-		return cur, platform.Statef("contract %q is not active now (state=%s)", id, cur.State)
-	}
-	if cur.Remaining() < amount {
-		return cur, platform.Conflictf("contract %q has %.2f remaining, need %.2f",
-			id, cur.Remaining(), amount)
-	}
-	out, _ := s.store.Update(id, func(x *Contract) {
-		x.UsedVolume += amount
-	})
 	if s.audit != nil {
 		_ = s.audit.Record(ctx, "nomination", "reserve_capacity", "contract", id,
 			fmt.Sprintf("amount=%.2f remaining=%.2f", amount, out.Remaining()))
