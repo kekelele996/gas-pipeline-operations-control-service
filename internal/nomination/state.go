@@ -8,7 +8,8 @@ import "gas-pipeline-operations-control-service/internal/platform"
 // Transitions encodes allowed nomination-state moves.
 var Transitions = map[string][]string{
 	StateDraft.String():     {StateSubmitted.String(), StateCancelled.String()},
-	StateSubmitted.String(): {StateConfirmed.String(), StateCancelled.String()},
+	StateSubmitted.String(): {StateConfirmed.String(), StateHeld.String(), StateCancelled.String()},
+	StateHeld.String():      {StateCancelled.String()},
 	StateConfirmed.String(): {StateExecuted.String(), StateCancelled.String()},
 	StateExecuted.String():  {},
 	StateCancelled.String(): {},

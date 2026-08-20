@@ -92,3 +92,8 @@ func Category(err error) error {
 	}
 	return err
 }
+
+// Exhaustedf returns a categorized error for capacity/quota exhaustion.
+func Exhaustedf(format string, args ...any) *Error {
+	return Newf(ErrExhausted, format, args...)
+}

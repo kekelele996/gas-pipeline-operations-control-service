@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"gas-pipeline-operations-control-service/internal/platform"
 )
 
 // Store is the nomination repository.
@@ -86,9 +88,14 @@ func (s *Store) ForContractDate(contractID, date string) []Nomination {
 	ids := s.byContractDate[dateKey{contractID, date}]
 	out := make([]Nomination, 0, len(ids))
 	for _, id := range ids {
-		if n, ok := s.items[id]; ok {
-			out = append(out, *n)
+		n, ok := s.items[id]
+		if !ok {
+			continue
 		}
+		if n.State == StateHeld {
+			continue
+		}
+		out = append(out, *n)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
@@ -101,4 +108,53 @@ func appendUnique(s []string, v string) []string {
 		}
 	}
 	return append(s, v)
+}
+
+// ---- Capacity hold ----
+
+// Hold moves a submitted nomination to the held state. Held capacity remains
+// reserved on the contract until the nomination is confirmed or cancelled.
+func (s *Store) Hold(id string) (Nomination, error) {
+	n, ok := s.Get(id)
+	if !ok {
+		return Nomination{}, platform.NotFoundf("nomination %q not found", id)
+	}
+	next, err := MustTransition(n.State, StateHeld)
+	if err != nil {
+		return n, err
+	}
+	_, _ = s.Update(id, func(x *Nomination) { x.State = next })
+	return n, nil
+}
+
+// ConfirmHeld moves a held nomination to confirmed.
+func (s *Store) ConfirmHeld(id string) (Nomination, error) {
+	n, ok := s.Get(id)
+	if !ok {
+		return Nomination{}, platform.NotFoundf("nomination %q not found", id)
+	}
+	next, err := MustTransition(n.State, StateConfirmed)
+	if err != nil {
+		return n, err
+	}
+	_, _ = s.Update(id, func(x *Nomination) { x.State = next })
+	return n, nil
+}
+
+// CapacityUsed returns the total volume of nominations that currently hold
+// contract capacity for the given date (submitted, held, confirmed).
+func (s *Store) CapacityUsed(contractID, date string) float64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var used float64
+	for _, n := range s.items {
+		if n.ContractID != contractID || n.Date != date {
+			continue
+		}
+		switch n.State {
+		case StateSubmitted, StateConfirmed:
+			used += n.Volume
+		}
+	}
+	return used
 }

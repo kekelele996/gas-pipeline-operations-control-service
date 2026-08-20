@@ -13,6 +13,7 @@ type State string
 const (
 	StateDraft     State = "draft"
 	StateSubmitted State = "submitted"
+	StateHeld      State = "held"
 	StateConfirmed State = "confirmed"
 	StateExecuted  State = "executed"
 	StateCancelled State = "cancelled"

@@ -8,6 +8,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"gas-pipeline-operations-control-service/internal/platform"
 )
 
 // Store is the contract repository.
@@ -110,4 +112,38 @@ func appendUnique(s []string, v string) []string {
 		}
 	}
 	return append(s, v)
+}
+
+// ReserveAtomically checks the remaining capacity and reserves amount under
+// the per-contract lock, so concurrent nominations on the same contract can
+// never oversell. It returns a categorized error (not-found / state /
+// exhausted) on failure.
+func (s *Store) ReserveAtomically(id string, amount float64, now time.Time) (Contract, error) {
+	mu := s.lockFor(id)
+	mu.Lock()
+	defer mu.Unlock()
+
+	s.mu.Lock()
+	c, ok := s.contracts[id]
+	if !ok {
+		s.mu.Unlock()
+		return Contract{}, platform.NotFoundf("contract %q not found", id)
+	}
+	cur := *c
+	s.mu.Unlock()
+
+	if !cur.IsActiveNow(now) {
+		return cur, platform.Statef("contract %q is not active now (state=%s)", id, cur.State)
+	}
+	if cur.Remaining() < amount {
+		return cur, platform.Exhaustedf("contract %q has %.2f remaining, need %.2f",
+			id, cur.Remaining(), amount)
+	}
+
+	s.mu.Lock()
+	c.UsedVolume += amount
+	c.UpdatedAt = time.Now()
+	out := *c
+	s.mu.Unlock()
+	return out, nil
 }
