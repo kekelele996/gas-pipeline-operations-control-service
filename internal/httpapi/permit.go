@@ -54,9 +54,11 @@ func permitApproveHandler(deps Deps) http.HandlerFunc {
 		}
 		p, err := deps.Permit.Approve(r.Context(), pathValue(r, "id"), body.Approver)
 		if err != nil {
-			// a rejected approval is not an error for the client; return the
-			// permit as-is so the dashboard can show its current state
-			writeJSON(w, http.StatusOK, p)
+			// A rejected approval (overlapping permit, pending dispatch
+			// order, open incident, or illegal state) is a real error:
+			// surface it so the client sees the 409/conflict rather than a
+			// silent success that leaves the permit in its prior state.
+			mapError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, p)

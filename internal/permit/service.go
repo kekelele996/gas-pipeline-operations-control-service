@@ -100,9 +100,10 @@ func (s *Service) Approve(ctx context.Context, id, approver string) (p Permit, e
 		return Permit{}, platform.NotFoundf("permit %q not found", id)
 	}
 	defer func() {
+		// Audit is a best-effort side-channel; it must never clobber the
+		// business error returned to the caller.
 		if s.audit != nil {
-			// audit recording is authoritative for the request outcome
-			err = s.audit.Record(ctx, approver, "approve_permit", "permit", id, "")
+			_ = s.audit.Record(ctx, approver, "approve_permit", "permit", id, "")
 		}
 	}()
 	next, err := MustTransition(p.State, StateApproved)
@@ -142,8 +143,9 @@ func (s *Service) Start(ctx context.Context, id string) (p Permit, err error) {
 		return Permit{}, platform.NotFoundf("permit %q not found", id)
 	}
 	defer func() {
+		// Audit is best-effort; never overwrite the returned business error.
 		if s.audit != nil {
-			err = s.audit.Record(ctx, "operator", "start_permit", "permit", id, "")
+			_ = s.audit.Record(ctx, "operator", "start_permit", "permit", id, "")
 		}
 	}()
 	next, err := MustTransition(p.State, StateInProgress)
@@ -164,8 +166,9 @@ func (s *Service) Complete(ctx context.Context, id string) (p Permit, err error)
 		return Permit{}, platform.NotFoundf("permit %q not found", id)
 	}
 	defer func() {
+		// Audit is best-effort; never overwrite the returned business error.
 		if s.audit != nil {
-			err = s.audit.Record(ctx, "operator", "complete_permit", "permit", id, "")
+			_ = s.audit.Record(ctx, "operator", "complete_permit", "permit", id, "")
 		}
 	}()
 	next, err := MustTransition(p.State, StateCompleted)
@@ -186,8 +189,9 @@ func (s *Service) Cancel(ctx context.Context, id, reason string) (p Permit, err 
 		return Permit{}, platform.NotFoundf("permit %q not found", id)
 	}
 	defer func() {
+		// Audit is best-effort; never overwrite the returned business error.
 		if s.audit != nil {
-			err = s.audit.Record(ctx, "operator", "cancel_permit", "permit", id, reason)
+			_ = s.audit.Record(ctx, "operator", "cancel_permit", "permit", id, reason)
 		}
 	}()
 	next, err := MustTransition(p.State, StateCancelled)

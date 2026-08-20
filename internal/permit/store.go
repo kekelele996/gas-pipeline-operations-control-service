@@ -69,7 +69,9 @@ func (s *Store) All() []Permit {
 }
 
 // OpenForSegment returns copies of open permits for a segment whose window
-// overlaps [start,end]. Used for conflict checks during approval.
+// overlaps [start,end]. Used for conflict checks during approval. Two windows
+// [s1,e1] and [s2,e2] overlap when s1 < e2 && s2 < e1; permits that merely
+// touch end-to-end (e1 == s2) do not conflict.
 func (s *Store) OpenForSegment(segmentID string, start, end time.Time) []Permit {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -78,8 +80,10 @@ func (s *Store) OpenForSegment(segmentID string, start, end time.Time) []Permit 
 		if p.SegmentID != segmentID || !p.IsOpen() {
 			continue
 		}
-		// any open permit on the segment blocks the window
-		out = append(out, *p)
+		// overlap only when the windows actually intersect
+		if p.WindowStart.Before(end) && start.Before(p.WindowEnd) {
+			out = append(out, *p)
+		}
 	}
 	return out
 }
