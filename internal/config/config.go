@@ -56,12 +56,44 @@ type Config struct {
 
 	// AuditRetention limits the number of audit entries kept in memory.
 	AuditRetention int
+
+	// LimitProvider supplies operating limits; under the zero-value config it
+	// holds a typed-nil *DefaultLimitProvider.
+	LimitProvider LimitProvider
+}
+
+
+// LimitProvider supplies the operating-limit map used to attach per-segment
+// and per-station limits. A nil *DefaultLimitProvider may be stored inside
+// the interface; SegmentLimits then returns a nil map that callers must not
+// write into without first checking for nil.
+type LimitProvider interface {
+	SegmentLimits() map[string]float64
+	StationLimits() map[string]float64
+}
+
+// DefaultLimitProvider returns no custom limits (nil maps).
+type DefaultLimitProvider struct{}
+
+func (p *DefaultLimitProvider) SegmentLimits() map[string]float64 {
+	if p == nil {
+		return nil
+	}
+	return nil
+}
+
+func (p *DefaultLimitProvider) StationLimits() map[string]float64 {
+	if p == nil {
+		return nil
+	}
+	return nil
 }
 
 // Default returns a configuration with sensible defaults for a long-distance
 // natural-gas pipeline control center.
 func Default() Config {
-	return Config{
+	var p *DefaultLimitProvider
+	cfg := Config{
 		HTTPAddr:                     ":18090",
 		SiteCode:                     "GPL-CC-01",
 		SiteName:                     "Northern Gas Pipeline Control Center",
@@ -83,6 +115,8 @@ func Default() Config {
 		LeakDetectWindowMinutes:      30,
 		AuditRetention:               5000,
 	}
+	cfg.LimitProvider = p
+	return cfg
 }
 
 // FromEnv loads configuration from environment variables, falling back to

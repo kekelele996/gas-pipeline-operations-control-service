@@ -22,6 +22,9 @@ type Store struct {
 	stationSegments map[string][]string
 	// index: segment -> devices on it
 	segmentDevices map[string]DeviceRefs
+
+	// limits holds operator-set operating limits per segment / station.
+	limits map[string]float64
 }
 
 // DeviceRefs groups device ids attached to a segment.
@@ -392,4 +395,58 @@ func (s *Store) Counts() (segments, stations, compressors, valves, points int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.segments), len(s.stations), len(s.compressors), len(s.valves), len(s.points)
+}
+
+// ---- Operating limits ----
+
+// PutSegmentLimit stores an operator-set limit for a segment.
+func (s *Store) PutSegmentLimit(segmentID string, value float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.limits[segmentID] = value
+}
+
+// PutStationLimit stores an operator-set limit for a station.
+func (s *Store) PutStationLimit(stationID string, value float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.limits[stationID] = value
+}
+
+// SegmentLimit returns the operator-set limit for a segment, if any.
+func (s *Store) SegmentLimit(segmentID string) (float64, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v, ok := s.limits[segmentID]
+	return v, ok
+}
+
+// PutValveLimit stores an operator-set limit for a valve.
+func (s *Store) PutValveLimit(valveID string, value float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.limits[valveID] = value
+}
+
+// PutCompressorLimit stores an operator-set limit for a compressor.
+func (s *Store) PutCompressorLimit(compressorID string, value float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.limits[compressorID] = value
+}
+
+// ValveLimit returns the operator-set limit for a valve, if any.
+func (s *Store) ValveLimit(valveID string) (float64, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v, ok := s.limits[valveID]
+	return v, ok
+}
+
+// CompressorLimit returns the operator-set limit for a compressor, if any.
+func (s *Store) CompressorLimit(compressorID string) (float64, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v, ok := s.limits[compressorID]
+	return v, ok
 }

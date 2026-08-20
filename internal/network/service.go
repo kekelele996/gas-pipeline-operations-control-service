@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"gas-pipeline-operations-control-service/internal/config"
 	"gas-pipeline-operations-control-service/internal/platform"
 )
 
@@ -11,9 +12,10 @@ import (
 // It validates input, applies state-machine rules, and records audit
 // entries through the injected audit recorder.
 type Service struct {
-	store *Store
-	clock platform.Clock
-	audit AuditRecorder
+	store  *Store
+	clock  platform.Clock
+	audit  AuditRecorder
+	limits config.LimitProvider
 }
 
 // AuditRecorder is the minimal surface the network service needs to record
@@ -28,6 +30,19 @@ func NewService(store *Store, clock platform.Clock, audit AuditRecorder) *Servic
 		clock = platform.SystemClock{}
 	}
 	return &Service{store: store, clock: clock, audit: audit}
+}
+
+// SetLimitProvider installs the operating-limit provider. The provider's
+// maps may be nil under the zero-value configuration; callers must guard.
+func (s *Service) SetLimitProvider(p config.LimitProvider) { s.limits = p }
+
+// OperatingLimits returns the provider's segment/station limit map. The map
+// may be nil when the provider is a typed-nil default.
+func (s *Service) OperatingLimits() map[string]float64 {
+	if s.limits == nil {
+		return nil
+	}
+	return s.limits.SegmentLimits()
 }
 
 // Store exposes the underlying store for read-only consumers (e.g. the
@@ -499,4 +514,77 @@ func (s *Service) Now() time.Time { return s.clock.Now() }
 // Counts returns aggregate counts for the summary endpoint.
 func (s *Service) Counts() (segments, stations, compressors, valves, points int) {
 	return s.store.Counts()
+}
+
+
+// ---- Operating limits (operator-set) ----
+
+// RecordOperatingLimit records an operator-set limit for a segment, both in
+// the provider's limit map and in the topology store.
+func (s *Service) RecordOperatingLimit(ctx context.Context, segmentID string, value float64) error {
+	if _, ok := s.store.Segment(segmentID); !ok {
+		return platform.NotFoundf("segment %q not found", segmentID)
+	}
+	if s.limits != nil {
+		m := s.limits.SegmentLimits()
+		m[segmentID] = value
+	}
+	s.store.PutSegmentLimit(segmentID, value)
+	return nil
+}
+
+// RecordStationLimit records an operator-set limit for a station.
+func (s *Service) RecordStationLimit(ctx context.Context, stationID string, value float64) error {
+	if _, ok := s.store.Station(stationID); !ok {
+		return platform.NotFoundf("station %q not found", stationID)
+	}
+	if s.limits != nil {
+		m := s.limits.StationLimits()
+		m[stationID] = value
+	}
+	s.store.PutStationLimit(stationID, value)
+	return nil
+}
+
+// RecordValveLimit records an operator-set limit for a valve.
+func (s *Service) RecordValveLimit(ctx context.Context, valveID string, value float64) error {
+	if _, ok := s.store.Valve(valveID); !ok {
+		return platform.NotFoundf("valve %q not found", valveID)
+	}
+	if s.limits != nil {
+		m := s.limits.SegmentLimits()
+		m[valveID] = value
+	}
+	s.store.PutValveLimit(valveID, value)
+	return nil
+}
+
+// RecordCompressorLimit records an operator-set limit for a compressor.
+func (s *Service) RecordCompressorLimit(ctx context.Context, compressorID string, value float64) error {
+	if _, ok := s.store.Compressor(compressorID); !ok {
+		return platform.NotFoundf("compressor %q not found", compressorID)
+	}
+	if s.limits != nil {
+		m := s.limits.SegmentLimits()
+		m[compressorID] = value
+	}
+	s.store.PutCompressorLimit(compressorID, value)
+	return nil
+}
+
+// ApplySegmentLimits records a batch of segment limits.
+func (s *Service) ApplySegmentLimits(ctx context.Context, values map[string]float64) (int, error) {
+	var applied int
+	for id, v := range values {
+		if _, ok := s.store.Segment(id); !ok {
+			continue
+		}
+		if s.limits != nil {
+			m := s.limits.SegmentLimits()
+			m[id] = v
+		}
+		s.store.PutSegmentLimit(id, v)
+		applied++
+	}
+	return applied, nil
 }

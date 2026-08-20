@@ -25,6 +25,7 @@ func NewRouter(deps Deps) http.Handler {
 	mux.HandleFunc("POST /api/segments", upsertSegmentHandler(deps))
 	mux.HandleFunc("GET /api/segments/{id}", getSegmentHandler(deps))
 	mux.HandleFunc("GET /api/segments/{id}/devices", listSegmentDevicesHandler(deps))
+	mux.HandleFunc("POST /api/segments/{id}/limits", recordSegmentLimitHandler(deps))
 	mux.HandleFunc("GET /api/stations", listStationsHandler(deps))
 	mux.HandleFunc("POST /api/stations", upsertStationHandler(deps))
 	mux.HandleFunc("GET /api/stations/{id}", getStationHandler(deps))

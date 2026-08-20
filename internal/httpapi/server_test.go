@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"gas-pipeline-operations-control-service/internal/audit"
+	"gas-pipeline-operations-control-service/internal/config"
 	"gas-pipeline-operations-control-service/internal/contract"
 	"gas-pipeline-operations-control-service/internal/dispatch"
 	"gas-pipeline-operations-control-service/internal/incident"
@@ -53,6 +54,7 @@ func newTestDeps(t *testing.T) (Deps, *httptest.Server) {
 	c := testClock{}
 	auditSvc := audit.NewService(audit.NewStore(1000), c)
 	ns := network.NewService(network.NewStore(), c, auditSvc)
+	ns.SetLimitProvider(config.Default().LimitProvider)
 	scadaSvc := scada.NewService(scada.NewStore(200), c, 0.5)
 	meterSvc := metering.NewService(metering.NewStore(5000), c, auditSvc)
 	contractSvc := contract.NewService(contract.NewStore(), c, auditSvc)

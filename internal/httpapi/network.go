@@ -261,3 +261,21 @@ func togglePointHandler(deps Deps) http.HandlerFunc {
 		writeJSON(w, http.StatusOK, p)
 	}
 }
+// recordSegmentLimitHandler records an operator-set limit for a segment.
+func recordSegmentLimitHandler(deps Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Value float64 `json:"value"`
+		}
+		if err := decodeBody(r, &body); err != nil {
+			mapError(w, err)
+			return
+		}
+		id := pathValue(r, "id")
+		if err := deps.Network.RecordOperatingLimit(r.Context(), id, body.Value); err != nil {
+			mapError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"segment_id": id, "value": body.Value})
+	}
+}

@@ -52,6 +52,7 @@ func main() {
 	// ---- network ----
 	netStore := network.NewStore()
 	netSvc := network.NewService(netStore, clock, auditSvc)
+	netSvc.SetLimitProvider(cfg.LimitProvider)
 
 	// ---- scada ----
 	scadaStore := scada.NewStore(cfg.ScadaReadingBuffer)

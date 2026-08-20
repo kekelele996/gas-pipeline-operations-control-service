@@ -45,6 +45,10 @@ type NetworkService interface {
 	UpsertPoint(ctx context.Context, in network.PointInput) (network.Point, error)
 	TogglePoint(ctx context.Context, id string, enabled bool) (network.Point, error)
 	Counts() (segments, stations, compressors, valves, points int)
+
+	OperatingLimits() map[string]float64
+	RecordOperatingLimit(ctx context.Context, segmentID string, value float64) error
+	RecordStationLimit(ctx context.Context, stationID string, value float64) error
 }
 
 // ---- SCADA ----
