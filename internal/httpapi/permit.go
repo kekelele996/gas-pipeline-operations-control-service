@@ -54,7 +54,9 @@ func permitApproveHandler(deps Deps) http.HandlerFunc {
 		}
 		p, err := deps.Permit.Approve(r.Context(), pathValue(r, "id"), body.Approver)
 		if err != nil {
-			mapError(w, err)
+			// a rejected approval is not an error for the client; return the
+			// permit as-is so the dashboard can show its current state
+			writeJSON(w, http.StatusOK, p)
 			return
 		}
 		writeJSON(w, http.StatusOK, p)

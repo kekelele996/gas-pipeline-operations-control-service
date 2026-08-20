@@ -78,9 +78,8 @@ func (s *Store) OpenForSegment(segmentID string, start, end time.Time) []Permit 
 		if p.SegmentID != segmentID || !p.IsOpen() {
 			continue
 		}
-		if p.WindowStart.Before(end) && p.WindowEnd.After(start) {
-			out = append(out, *p)
-		}
+		// any open permit on the segment blocks the window
+		out = append(out, *p)
 	}
 	return out
 }
