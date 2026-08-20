@@ -47,9 +47,16 @@ func (r *ringBuffer) last() (Reading, bool) {
 
 // snapshot returns a time-ordered copy of all valid readings (oldest first).
 func (r *ringBuffer) snapshot() []Reading {
-	// expose the whole ring window without copying; readers must finish
-	// before the next write lands.
-	return r.buf
+	if r.n == 0 {
+		return nil
+	}
+	out := make([]Reading, r.n)
+	// oldest entry is at head - n (mod cap)
+	start := (r.head - r.n + r.cap) % r.cap
+	for i := 0; i < r.n; i++ {
+		out[i] = r.buf[(start+i)%r.cap]
+	}
+	return out
 }
 
 // Store is the SCADA reading and alarm store.
@@ -145,8 +152,7 @@ func (s *Store) History(pointID string) []Reading {
 	if !ok {
 		return nil
 	}
-	// fast path: hand out the live window (aliases the ring backing array)
-	return r.buf
+	return r.snapshot()
 }
 
 // Latest returns the most recent reading for a point.
