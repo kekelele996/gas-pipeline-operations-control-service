@@ -32,17 +32,22 @@ func NewService(store *Store, clock platform.Clock, audit AuditRecorder) *Servic
 	return &Service{store: store, clock: clock, audit: audit}
 }
 
-// SetLimitProvider installs the operating-limit provider. The provider's
-// maps may be nil under the zero-value configuration; callers must guard.
+// SetLimitProvider installs the operating-limit provider. The provider may
+// be a typed-nil *DefaultLimitProvider under the default configuration; the
+// service tolerates that and any nil maps returned by the provider.
 func (s *Service) SetLimitProvider(p config.LimitProvider) { s.limits = p }
 
-// OperatingLimits returns the provider's segment/station limit map. The map
-// may be nil when the provider is a typed-nil default.
+// OperatingLimits returns the provider's segment limit map. The result is
+// always non-nil and writable, even when no provider is installed or the
+// provider returns a nil map; callers may assign into it directly.
 func (s *Service) OperatingLimits() map[string]float64 {
 	if s.limits == nil {
-		return nil
+		return map[string]float64{}
 	}
-	return s.limits.SegmentLimits()
+	if m := s.limits.SegmentLimits(); m != nil {
+		return m
+	}
+	return map[string]float64{}
 }
 
 // Store exposes the underlying store for read-only consumers (e.g. the
@@ -519,14 +524,32 @@ func (s *Service) Counts() (segments, stations, compressors, valves, points int)
 
 // ---- Operating limits (operator-set) ----
 
+// segmentLimitMap returns a writable segment-limit map from the provider. It
+// tolerates a nil/typed-nil provider (the default configuration stores a
+// typed-nil *DefaultLimitProvider) and any nil map the provider may return,
+// so recording a limit can never panic on a nil map.
+func (s *Service) segmentLimitMap() map[string]float64 {
+	if s.limits == nil {
+		return nil
+	}
+	return s.limits.SegmentLimits()
+}
+
+// stationLimitMap is the station counterpart of segmentLimitMap.
+func (s *Service) stationLimitMap() map[string]float64 {
+	if s.limits == nil {
+		return nil
+	}
+	return s.limits.StationLimits()
+}
+
 // RecordOperatingLimit records an operator-set limit for a segment, both in
 // the provider's limit map and in the topology store.
 func (s *Service) RecordOperatingLimit(ctx context.Context, segmentID string, value float64) error {
 	if _, ok := s.store.Segment(segmentID); !ok {
 		return platform.NotFoundf("segment %q not found", segmentID)
 	}
-	if s.limits != nil {
-		m := s.limits.SegmentLimits()
+	if m := s.segmentLimitMap(); m != nil {
 		m[segmentID] = value
 	}
 	s.store.PutSegmentLimit(segmentID, value)
@@ -538,8 +561,7 @@ func (s *Service) RecordStationLimit(ctx context.Context, stationID string, valu
 	if _, ok := s.store.Station(stationID); !ok {
 		return platform.NotFoundf("station %q not found", stationID)
 	}
-	if s.limits != nil {
-		m := s.limits.StationLimits()
+	if m := s.stationLimitMap(); m != nil {
 		m[stationID] = value
 	}
 	s.store.PutStationLimit(stationID, value)
@@ -551,8 +573,7 @@ func (s *Service) RecordValveLimit(ctx context.Context, valveID string, value fl
 	if _, ok := s.store.Valve(valveID); !ok {
 		return platform.NotFoundf("valve %q not found", valveID)
 	}
-	if s.limits != nil {
-		m := s.limits.SegmentLimits()
+	if m := s.segmentLimitMap(); m != nil {
 		m[valveID] = value
 	}
 	s.store.PutValveLimit(valveID, value)
@@ -564,8 +585,7 @@ func (s *Service) RecordCompressorLimit(ctx context.Context, compressorID string
 	if _, ok := s.store.Compressor(compressorID); !ok {
 		return platform.NotFoundf("compressor %q not found", compressorID)
 	}
-	if s.limits != nil {
-		m := s.limits.SegmentLimits()
+	if m := s.segmentLimitMap(); m != nil {
 		m[compressorID] = value
 	}
 	s.store.PutCompressorLimit(compressorID, value)
@@ -575,13 +595,16 @@ func (s *Service) RecordCompressorLimit(ctx context.Context, compressorID string
 // ApplySegmentLimits records a batch of segment limits.
 func (s *Service) ApplySegmentLimits(ctx context.Context, values map[string]float64) (int, error) {
 	var applied int
+	var lm map[string]float64
 	for id, v := range values {
 		if _, ok := s.store.Segment(id); !ok {
 			continue
 		}
-		if s.limits != nil {
-			m := s.limits.SegmentLimits()
-			m[id] = v
+		if lm == nil {
+			lm = s.segmentLimitMap()
+		}
+		if lm != nil {
+			lm[id] = v
 		}
 		s.store.PutSegmentLimit(id, v)
 		applied++

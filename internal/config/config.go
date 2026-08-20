@@ -64,29 +64,26 @@ type Config struct {
 
 
 // LimitProvider supplies the operating-limit map used to attach per-segment
-// and per-station limits. A nil *DefaultLimitProvider may be stored inside
-// the interface; SegmentLimits then returns a nil map that callers must not
-// write into without first checking for nil.
+// and per-station limits. Implementations must return a non-nil, writable map
+// from SegmentLimits/StationLimits so callers can record limits without
+// guarding against a nil map.
 type LimitProvider interface {
 	SegmentLimits() map[string]float64
 	StationLimits() map[string]float64
 }
 
-// DefaultLimitProvider returns no custom limits (nil maps).
+// DefaultLimitProvider returns empty, writable limit maps. A typed-nil
+// *DefaultLimitProvider may be stored inside the LimitProvider interface
+// (the default config does this); the methods still return non-nil maps so
+// that recording an operator-set limit never panics on a nil map.
 type DefaultLimitProvider struct{}
 
 func (p *DefaultLimitProvider) SegmentLimits() map[string]float64 {
-	if p == nil {
-		return nil
-	}
-	return nil
+	return map[string]float64{}
 }
 
 func (p *DefaultLimitProvider) StationLimits() map[string]float64 {
-	if p == nil {
-		return nil
-	}
-	return nil
+	return map[string]float64{}
 }
 
 // Default returns a configuration with sensible defaults for a long-distance
