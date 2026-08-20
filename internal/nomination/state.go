@@ -9,7 +9,7 @@ import "gas-pipeline-operations-control-service/internal/platform"
 var Transitions = map[string][]string{
 	StateDraft.String():     {StateSubmitted.String(), StateCancelled.String()},
 	StateSubmitted.String(): {StateConfirmed.String(), StateHeld.String(), StateCancelled.String()},
-	StateHeld.String():      {StateCancelled.String()},
+	StateHeld.String():      {StateConfirmed.String(), StateCancelled.String()},
 	StateConfirmed.String(): {StateExecuted.String(), StateCancelled.String()},
 	StateExecuted.String():  {},
 	StateCancelled.String(): {},
@@ -20,7 +20,7 @@ func (s State) String() string { return string(s) }
 
 // AllStates lists every nomination state.
 func AllStates() []State {
-	return []State{StateDraft, StateSubmitted, StateConfirmed, StateExecuted, StateCancelled}
+	return []State{StateDraft, StateSubmitted, StateHeld, StateConfirmed, StateExecuted, StateCancelled}
 }
 
 // CanTransition reports whether src->dst is a legal nomination move.
