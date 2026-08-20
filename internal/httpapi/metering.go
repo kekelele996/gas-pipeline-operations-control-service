@@ -101,7 +101,7 @@ func meterConfirmHandler(deps Deps) http.HandlerFunc {
 		}
 		st, err := deps.Metering.Confirm(r.Context(), pathValue(r, "date"), body.By)
 		if err != nil {
-			writeJSON(w, http.StatusOK, metering.Settlement{})
+			mapError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, st)
@@ -117,7 +117,7 @@ func meterReconcileHandler(deps Deps) http.HandlerFunc {
 		}
 		st, err := deps.Metering.Reconcile(r.Context(), pathValue(r, "date"), body.By)
 		if err != nil {
-			writeJSON(w, http.StatusOK, metering.Settlement{})
+			mapError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, st)
@@ -134,9 +134,7 @@ func meterGetSettlementHandler(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		st, err := deps.Metering.GetSettlement(r.Context(), pathValue(r, "date"))
 		if err != nil {
-			// a missing settlement is a normal condition; hand back an empty
-			// draft so the dashboard can render without an error state
-			writeJSON(w, http.StatusOK, metering.Settlement{})
+			mapError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, st)
