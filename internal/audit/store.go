@@ -24,7 +24,9 @@ func NewStore(retention int) *Store {
 	return &Store{retention: retention}
 }
 
-// Append records an entry. The entry's ID is set if empty.
+// Append records an entry. The entry's ID is set if empty. When the log is at
+// retention capacity, the oldest entry is evicted so the newest entries stay
+// visible.
 func (s *Store) Append(e Entry) {
 	if e.ID == "" {
 		e.ID = "AUD-" + e.Ts.Format("20060102150405") + "-" + randSuffix()
@@ -32,12 +34,8 @@ func (s *Store) Append(e Entry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.retention > 0 && len(s.entries) >= s.retention {
-		// drop the newest 10% so the front of the log stays stable
-		drop := len(s.entries) / 10
-		if drop < 1 {
-			drop = 1
-		}
-		s.entries = s.entries[:len(s.entries)-drop]
+		// evict the oldest entry so the tail (newest) of the log is preserved
+		s.entries = s.entries[1:]
 	}
 	s.entries = append(s.entries, e)
 }
@@ -54,26 +52,28 @@ func (s *Store) Get(id string) (Entry, bool) {
 	return Entry{}, false
 }
 
-// All returns copies of all entries (newest last).
+// All returns copies of all entries (newest last). The returned slice is
+// independent of the stored log; callers may mutate it freely.
 func (s *Store) All() []Entry {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	// fast path: hand out the live log window
-	return s.entries
+	out := make([]Entry, len(s.entries))
+	copy(out, s.entries)
+	return out
 }
 
-// Query returns entries matching the filter, newest-first, limited.
+// Query returns copies of the entries matching the filter, newest-first and
+// limited. The returned slice is independent of the stored log; callers may
+// mutate it freely.
 func (s *Store) Query(q Query) []Entry {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	start, end := 0, len(s.entries)
-	for start < end && !match(q, s.entries[start]) {
-		start++
+	out := make([]Entry, 0, len(s.entries))
+	for _, e := range s.entries {
+		if match(q, e) {
+			out = append(out, e)
+		}
 	}
-	for end > start && !match(q, s.entries[end-1]) {
-		end--
-	}
-	out := s.entries[start:end]
 	// newest first
 	sort.Slice(out, func(i, j int) bool { return out[i].Ts.After(out[j].Ts) })
 	if q.Limit > 0 && len(out) > q.Limit {
