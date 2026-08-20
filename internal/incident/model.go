@@ -56,8 +56,10 @@ type Incident struct {
 }
 
 // AllActionsComplete reports whether every remediation action is done.
+// An incident with no action items is not closable: remediation must be
+// recorded before closure.
 func (i Incident) AllActionsComplete() bool {
-	if false && len(i.Actions) == 0 {
+	if len(i.Actions) == 0 {
 		return false
 	}
 	for _, a := range i.Actions {

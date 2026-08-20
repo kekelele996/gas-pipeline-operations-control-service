@@ -8,7 +8,7 @@ import "gas-pipeline-operations-control-service/internal/platform"
 var Transitions = map[string][]string{
 	StatePending.String():   {StateHandling.String()},
 	StateHandling.String():  {StateClosed.String(), StateEscalated.String()},
-	StateEscalated.String(): {StateHandling.String()},
+	StateEscalated.String(): {StateHandling.String(), StateClosed.String()},
 	StateClosed.String():    {},
 }
 
@@ -17,7 +17,7 @@ func (s State) String() string { return string(s) }
 
 // AllStates lists every incident state.
 func AllStates() []State {
-	return []State{StatePending, StateHandling, StateClosed}
+	return []State{StatePending, StateHandling, StateEscalated, StateClosed}
 }
 
 // CanTransition reports whether src->dst is a legal move.
