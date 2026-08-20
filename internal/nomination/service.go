@@ -71,7 +71,7 @@ func (s *Service) Create(ctx context.Context, in Input) (Nomination, error) {
 	}
 	c, err := s.contracts.Get(ctx, in.ContractID)
 	if err != nil {
-		return Nomination{}, err
+		return Nomination{}, fmt.Errorf("contract lookup failed: %v", err)
 	}
 	n := Nomination{
 		ID: platform.NewNominationID(), ContractID: in.ContractID,
@@ -93,14 +93,14 @@ func (s *Service) Create(ctx context.Context, in Input) (Nomination, error) {
 func (s *Service) Submit(ctx context.Context, id, by string) (Nomination, error) {
 	n, ok := s.store.Get(id)
 	if !ok {
-		return Nomination{}, platform.NotFoundf("nomination %q not found", id)
+		return Nomination{}, fmt.Errorf("nomination %q not found", id)
 	}
 	if _, err := MustTransition(n.State, StateSubmitted); err != nil {
-		return n, err
+		return n, fmt.Errorf("cannot submit nomination: %v", err)
 	}
 	// reserve capacity — atomic per contract via contract service
 	if _, err := s.contracts.Reserve(ctx, n.ContractID, n.Volume); err != nil {
-		return n, err
+		return n, fmt.Errorf("capacity reservation failed: %v", err)
 	}
 	out, _ := s.store.Update(id, func(x *Nomination) {
 		x.State = StateSubmitted
@@ -122,7 +122,7 @@ func (s *Service) Confirm(ctx context.Context, id, by string) (Nomination, error
 	}
 	next, err := MustTransition(n.State, StateConfirmed)
 	if err != nil {
-		return n, err
+		return n, fmt.Errorf("cannot confirm nomination: %v", err)
 	}
 	out, _ := s.store.Update(id, func(x *Nomination) {
 		x.State = next
@@ -144,7 +144,7 @@ func (s *Service) Execute(ctx context.Context, id string) (Nomination, error) {
 	}
 	next, err := MustTransition(n.State, StateExecuted)
 	if err != nil {
-		return n, err
+		return n, fmt.Errorf("cannot execute nomination: %v", err)
 	}
 	out, _ := s.store.Update(id, func(x *Nomination) {
 		x.State = next
