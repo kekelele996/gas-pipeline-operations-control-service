@@ -37,12 +37,16 @@ func NewService(store *Store, clock platform.Clock, audit AuditRecorder) *Servic
 func (s *Service) SetLimitProvider(p config.LimitProvider) { s.limits = p }
 
 // OperatingLimits returns the provider's segment/station limit map. The map
-// may be nil when the provider is a typed-nil default.
+// is guaranteed non-nil so callers can write into it safely.
 func (s *Service) OperatingLimits() map[string]float64 {
 	if s.limits == nil {
 		return nil
 	}
-	return s.limits.SegmentLimits()
+	m := s.limits.SegmentLimits()
+	if m == nil {
+		m = make(map[string]float64)
+	}
+	return m
 }
 
 // Store exposes the underlying store for read-only consumers (e.g. the
@@ -527,6 +531,9 @@ func (s *Service) RecordOperatingLimit(ctx context.Context, segmentID string, va
 	}
 	if s.limits != nil {
 		m := s.limits.SegmentLimits()
+		if m == nil {
+			m = make(map[string]float64)
+		}
 		m[segmentID] = value
 	}
 	s.store.PutSegmentLimit(segmentID, value)
@@ -540,6 +547,9 @@ func (s *Service) RecordStationLimit(ctx context.Context, stationID string, valu
 	}
 	if s.limits != nil {
 		m := s.limits.StationLimits()
+		if m == nil {
+			m = make(map[string]float64)
+		}
 		m[stationID] = value
 	}
 	s.store.PutStationLimit(stationID, value)
@@ -553,6 +563,9 @@ func (s *Service) RecordValveLimit(ctx context.Context, valveID string, value fl
 	}
 	if s.limits != nil {
 		m := s.limits.SegmentLimits()
+		if m == nil {
+			m = make(map[string]float64)
+		}
 		m[valveID] = value
 	}
 	s.store.PutValveLimit(valveID, value)
@@ -566,6 +579,9 @@ func (s *Service) RecordCompressorLimit(ctx context.Context, compressorID string
 	}
 	if s.limits != nil {
 		m := s.limits.SegmentLimits()
+		if m == nil {
+			m = make(map[string]float64)
+		}
 		m[compressorID] = value
 	}
 	s.store.PutCompressorLimit(compressorID, value)
@@ -581,6 +597,9 @@ func (s *Service) ApplySegmentLimits(ctx context.Context, values map[string]floa
 		}
 		if s.limits != nil {
 			m := s.limits.SegmentLimits()
+			if m == nil {
+				m = make(map[string]float64)
+			}
 			m[id] = v
 		}
 		s.store.PutSegmentLimit(id, v)

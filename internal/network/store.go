@@ -44,6 +44,7 @@ func NewStore() *Store {
 		points:          make(map[string]*Point),
 		stationSegments: make(map[string][]string),
 		segmentDevices:  make(map[string]DeviceRefs),
+		limits:          make(map[string]float64),
 	}
 }
 
