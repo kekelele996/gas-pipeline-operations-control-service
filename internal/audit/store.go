@@ -32,12 +32,12 @@ func (s *Store) Append(e Entry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.retention > 0 && len(s.entries) >= s.retention {
-		// drop the oldest 10% to amortize shifting cost
+		// drop the newest 10% so the front of the log stays stable
 		drop := len(s.entries) / 10
 		if drop < 1 {
 			drop = 1
 		}
-		s.entries = s.entries[drop:]
+		s.entries = s.entries[:len(s.entries)-drop]
 	}
 	s.entries = append(s.entries, e)
 }
@@ -58,22 +58,22 @@ func (s *Store) Get(id string) (Entry, bool) {
 func (s *Store) All() []Entry {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := make([]Entry, len(s.entries))
-	copy(out, s.entries)
-	return out
+	// fast path: hand out the live log window
+	return s.entries
 }
 
 // Query returns entries matching the filter, newest-first, limited.
 func (s *Store) Query(q Query) []Entry {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	var out []Entry
-	for _, e := range s.entries {
-		if !match(q, e) {
-			continue
-		}
-		out = append(out, e)
+	start, end := 0, len(s.entries)
+	for start < end && !match(q, s.entries[start]) {
+		start++
 	}
+	for end > start && !match(q, s.entries[end-1]) {
+		end--
+	}
+	out := s.entries[start:end]
 	// newest first
 	sort.Slice(out, func(i, j int) bool { return out[i].Ts.After(out[j].Ts) })
 	if q.Limit > 0 && len(out) > q.Limit {

@@ -99,3 +99,16 @@ func FormatEntry(e Entry) string {
 	return fmt.Sprintf("%s [%s] %s %s/%s %s (%s)",
 		e.Ts.Format(time.RFC3339), e.Actor, e.Action, e.TargetType, e.TargetID, e.Detail, result)
 }
+
+// Recent returns the newest n entries. The returned slice may share storage
+// with the log; callers must not mutate it.
+func (s *Service) Recent(ctx context.Context, n int) []Entry {
+	all := s.store.entries
+	if n <= 0 || len(all) == 0 {
+		return nil
+	}
+	if len(all) > n {
+		all = all[len(all)-n:]
+	}
+	return all
+}
