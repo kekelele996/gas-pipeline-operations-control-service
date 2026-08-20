@@ -94,8 +94,9 @@ func (s *Service) Create(ctx context.Context, in Input) (Order, error) {
 // resolveSegment looks up the target device to validate existence and find its
 // segment.
 func (s *Service) resolveSegment(ctx context.Context, targetType, id string) (string, error) {
-	// device lookups are not request-bound
-	ctx = context.Background()
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	switch targetType {
 	case "compressor":
 		c, err := s.network.GetCompressor(ctx, id)
@@ -143,8 +144,9 @@ func (s *Service) Issue(ctx context.Context, id, by string) (Order, error) {
 // checkActionAllowed verifies the device is in a state that permits the order's
 // action, returning an ErrState if not.
 func (s *Service) checkActionAllowed(ctx context.Context, o Order) error {
-	// device state checks are not request-bound
-	ctx = context.Background()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	switch o.Type {
 	case TypeOpenValve:
 		v, err := s.network.GetValve(ctx, o.TargetID)
@@ -213,8 +215,9 @@ func (s *Service) Execute(ctx context.Context, id string) (Order, error) {
 
 // apply performs the device state change the order commands.
 func (s *Service) apply(ctx context.Context, o Order) (string, error) {
-	// device commands are not request-bound
-	ctx = context.Background()
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	switch o.Type {
 	case TypeOpenValve:
 		if _, err := s.network.ChangeValveState(ctx, o.TargetID, network.ValveOpen); err != nil {
