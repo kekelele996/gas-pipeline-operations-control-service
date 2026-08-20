@@ -94,17 +94,11 @@ func (s *Service) Apply(ctx context.Context, in Input) (Permit, error) {
 // Approve moves a pending permit to approved, after verifying no conflicts
 // with other open permits, pending dispatch orders, or open incidents on the
 // same segment.
-func (s *Service) Approve(ctx context.Context, id, approver string) (p Permit, err error) {
+func (s *Service) Approve(ctx context.Context, id, approver string) (Permit, error) {
 	p, ok := s.store.Get(id)
 	if !ok {
 		return Permit{}, platform.NotFoundf("permit %q not found", id)
 	}
-	defer func() {
-		if s.audit != nil {
-			// audit recording is authoritative for the request outcome
-			err = s.audit.Record(ctx, approver, "approve_permit", "permit", id, "")
-		}
-	}()
 	next, err := MustTransition(p.State, StateApproved)
 	if err != nil {
 		return p, err
@@ -132,20 +126,18 @@ func (s *Service) Approve(ctx context.Context, id, approver string) (p Permit, e
 		x.State = next
 		x.Approver = approver
 	})
+	if s.audit != nil {
+		_ = s.audit.Record(ctx, approver, "approve_permit", "permit", id, "")
+	}
 	return out, nil
 }
 
 // Start moves an approved permit to in_progress.
-func (s *Service) Start(ctx context.Context, id string) (p Permit, err error) {
+func (s *Service) Start(ctx context.Context, id string) (Permit, error) {
 	p, ok := s.store.Get(id)
 	if !ok {
 		return Permit{}, platform.NotFoundf("permit %q not found", id)
 	}
-	defer func() {
-		if s.audit != nil {
-			err = s.audit.Record(ctx, "operator", "start_permit", "permit", id, "")
-		}
-	}()
 	next, err := MustTransition(p.State, StateInProgress)
 	if err != nil {
 		return p, err
@@ -154,20 +146,18 @@ func (s *Service) Start(ctx context.Context, id string) (p Permit, err error) {
 		x.State = next
 		x.StartedAt = s.clock.Now()
 	})
+	if s.audit != nil {
+		_ = s.audit.Record(ctx, "operator", "start_permit", "permit", id, "")
+	}
 	return out, nil
 }
 
 // Complete moves an in_progress permit to completed.
-func (s *Service) Complete(ctx context.Context, id string) (p Permit, err error) {
+func (s *Service) Complete(ctx context.Context, id string) (Permit, error) {
 	p, ok := s.store.Get(id)
 	if !ok {
 		return Permit{}, platform.NotFoundf("permit %q not found", id)
 	}
-	defer func() {
-		if s.audit != nil {
-			err = s.audit.Record(ctx, "operator", "complete_permit", "permit", id, "")
-		}
-	}()
 	next, err := MustTransition(p.State, StateCompleted)
 	if err != nil {
 		return p, err
@@ -176,20 +166,18 @@ func (s *Service) Complete(ctx context.Context, id string) (p Permit, err error)
 		x.State = next
 		x.CompletedAt = s.clock.Now()
 	})
+	if s.audit != nil {
+		_ = s.audit.Record(ctx, "operator", "complete_permit", "permit", id, "")
+	}
 	return out, nil
 }
 
 // Cancel moves a permit to cancelled with an optional reason.
-func (s *Service) Cancel(ctx context.Context, id, reason string) (p Permit, err error) {
+func (s *Service) Cancel(ctx context.Context, id, reason string) (Permit, error) {
 	p, ok := s.store.Get(id)
 	if !ok {
 		return Permit{}, platform.NotFoundf("permit %q not found", id)
 	}
-	defer func() {
-		if s.audit != nil {
-			err = s.audit.Record(ctx, "operator", "cancel_permit", "permit", id, reason)
-		}
-	}()
 	next, err := MustTransition(p.State, StateCancelled)
 	if err != nil {
 		return p, err
@@ -198,6 +186,9 @@ func (s *Service) Cancel(ctx context.Context, id, reason string) (p Permit, err 
 		x.State = next
 		x.CancelReason = reason
 	})
+	if s.audit != nil {
+		_ = s.audit.Record(ctx, "operator", "cancel_permit", "permit", id, reason)
+	}
 	return out, nil
 }
 
