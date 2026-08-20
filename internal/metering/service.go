@@ -102,7 +102,7 @@ func (s *Service) ListMeters(ctx context.Context) []Meter {
 func (s *Service) GetMeter(ctx context.Context, id string) (Meter, error) {
 	m, ok := s.store.Meter(id)
 	if !ok {
-		return Meter{}, platform.NotFoundf("meter %q not found", id)
+		return Meter{}, fmt.Errorf("meter %q not found", id)
 	}
 	return m, nil
 }
@@ -140,7 +140,7 @@ func (s *Service) RecordReading(ctx context.Context, rd RawReading) (DailyTotal,
 	}
 	m, ok := s.store.Meter(rd.MeterID)
 	if !ok {
-		return DailyTotal{}, platform.NotFoundf("meter %q not found", rd.MeterID)
+		return DailyTotal{}, fmt.Errorf("meter %q not found", rd.MeterID)
 	}
 	if !m.Enabled {
 		return DailyTotal{}, platform.Invalidf("meter %q disabled", rd.MeterID)
@@ -186,7 +186,7 @@ func (s *Service) RecordReading(ctx context.Context, rd RawReading) (DailyTotal,
 func (s *Service) GetDailyTotal(ctx context.Context, meterID string, date string) (DailyTotal, error) {
 	t, ok := s.store.DailyTotal(meterID, date)
 	if !ok {
-		return DailyTotal{}, platform.NotFoundf("no daily total for meter %q on %s", meterID, date)
+		return DailyTotal{}, fmt.Errorf("no daily total for meter %q on %s", meterID, date)
 	}
 	return t, nil
 }
@@ -202,7 +202,7 @@ func (s *Service) DailyForDate(ctx context.Context, date string) []DailyTotal {
 // aggregating every meter's daily total. The document starts in draft.
 func (s *Service) SettleDaily(ctx context.Context, date string) (Settlement, error) {
 	if date == "" {
-		return Settlement{}, platform.Invalidf("date must not be empty")
+		return Settlement{}, fmt.Errorf("date must not be empty")
 	}
 	totals := s.store.AllDailyForDate(date)
 	items := make([]LineItem, 0, len(totals))
@@ -239,7 +239,7 @@ func (s *Service) SettleDaily(ctx context.Context, date string) (Settlement, err
 func (s *Service) Confirm(ctx context.Context, date, by string) (Settlement, error) {
 	st, ok := s.store.Settlement(date)
 	if !ok {
-		return Settlement{}, platform.NotFoundf("settlement for %s not found", date)
+		return Settlement{}, fmt.Errorf("settlement for %s not found", date)
 	}
 	next, err := MustTransition(st.State, SettlementConfirmed)
 	if err != nil {
@@ -259,7 +259,7 @@ func (s *Service) Confirm(ctx context.Context, date, by string) (Settlement, err
 func (s *Service) Reconcile(ctx context.Context, date, by string) (Settlement, error) {
 	st, ok := s.store.Settlement(date)
 	if !ok {
-		return Settlement{}, platform.NotFoundf("settlement for %s not found", date)
+		return Settlement{}, fmt.Errorf("settlement for %s not found", date)
 	}
 	next, err := MustTransition(st.State, SettlementReconciled)
 	if err != nil {
@@ -279,7 +279,7 @@ func (s *Service) Reconcile(ctx context.Context, date, by string) (Settlement, e
 func (s *Service) GetSettlement(ctx context.Context, date string) (Settlement, error) {
 	st, ok := s.store.Settlement(date)
 	if !ok {
-		return Settlement{}, platform.NotFoundf("settlement for %s not found", date)
+		return Settlement{}, fmt.Errorf("settlement for %s not found", date)
 	}
 	return st, nil
 }
