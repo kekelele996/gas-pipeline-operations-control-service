@@ -68,18 +68,25 @@ func (s *Store) All() []Notification {
 	return out
 }
 
-// Queued returns copies of notifications in queued or retrying state (due for
-// a push attempt).
+// Due returns copies of notifications awaiting a delivery attempt. A queued
+// notification is always due. A retrying notification is due only once its
+// backoff window has elapsed (NextRetryAt <= now), which prevents re-attempts
+// from racing ahead of the configured retry interval.
 func (s *Store) Due(now time.Time) []Notification {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var out []Notification
 	for _, n := range s.items {
-		if n.State != StateQueued && n.State != StateRetrying {
+		switch n.State {
+		case StateQueued:
+			// newly enqueued: always due
+		case StateRetrying:
+			if n.NextRetryAt.IsZero() || now.Before(n.NextRetryAt) {
+				continue
+			}
+		default:
 			continue
 		}
-		// retrying messages are treated as due immediately; the caller
-		// (PushBatch) applies backoff when it marks them again
 		out = append(out, *n)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })

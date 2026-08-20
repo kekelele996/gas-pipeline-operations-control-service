@@ -87,45 +87,61 @@ func (s *Service) Enqueue(ctx context.Context, recipient string, ch Channel, sub
 // delivery succeeds or fails (simulated against the configured failure rate);
 // failed messages that have remaining attempts move to retrying, otherwise to
 // failed terminal. Returns the number sent and the number that failed.
+//
+// On context cancellation the producer stops feeding new jobs and the workers
+// drain whatever has already been queued; the call then returns ctx.Err() with
+// no goroutines left behind.
 func (s *Service) PushBatch(ctx context.Context) (sent, failed int, err error) {
 	due := s.store.Due(s.clock.Now())
 	if len(due) == 0 {
 		return 0, 0, nil
 	}
 	const workers = 4
+	// jobs is unbuffered so the producer does not race ahead of delivery and
+	// backpressure naturally limits in-flight work.
 	jobs := make(chan Notification)
+	// errCh is buffered to the total possible send count, so worker sends never
+	// block and closing it after all workers exit is safe.
 	errCh := make(chan error, len(due))
-	start := make(chan struct{})
+
 	var wg sync.WaitGroup
 	for i := 0; i < workers; i++ {
+		// Add before the worker goroutine starts, so wg.Wait never observes a
+		// zero counter while workers are still about to run.
+		wg.Add(1)
 		go func() {
-			<-start
-			time.Sleep(2 * time.Millisecond)
-			wg.Add(1)
 			defer wg.Done()
 			for n := range jobs {
 				errCh <- s.deliver(n)
 			}
 		}()
 	}
-	// producer feeds jobs to the workers
+
+	// producer feeds jobs to the workers, exiting early on cancellation.
 	go func() {
+		defer close(jobs)
 		for _, n := range due {
 			if ctx.Err() != nil {
 				return
 			}
-			jobs <- n
+			select {
+			case jobs <- n:
+			case <-ctx.Done():
+				return
+			}
 		}
-		close(jobs)
 	}()
-	close(start)
+
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
+
 	select {
 	case <-ctx.Done():
+		// wait for workers to finish draining jobs after the producer closed it
+		<-done
 		return sent, failed, ctx.Err()
 	case <-done:
 	}
@@ -141,18 +157,29 @@ func (s *Service) PushBatch(ctx context.Context) (sent, failed int, err error) {
 }
 
 // deliver attempts a single notification and updates its state. It returns a
-// non-nil error when the delivery did not succeed.
+// non-nil error when the delivery did not succeed. A delivery whose attempt
+// counter has reached MaxAttempts is written to the failed terminal state;
+// otherwise the notification moves to retrying with the next retry time set
+// from the backoff schedule.
 func (s *Service) deliver(n Notification) error {
 	if s.simulateSend() {
 		s.store.Update(n.ID, func(x *Notification) {
 			x.State = StateSent
 			x.Attempt++
 			x.SentAt = s.clock.Now()
+			x.LastError = ""
 		})
 		return nil
 	}
 	attempt := n.Attempt + 1
 	if attempt >= n.MaxAttempts {
+		// attempts exhausted: mark terminal so Due stops selecting it and
+		// it no longer accumulates as pending.
+		s.store.Update(n.ID, func(x *Notification) {
+			x.State = StateFailed
+			x.Attempt = attempt
+			x.LastError = "delivery failed (max attempts reached)"
+		})
 		return fmt.Errorf("delivery failed (max attempts reached)")
 	}
 	backoff := s.backoff(attempt)
