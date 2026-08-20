@@ -110,6 +110,27 @@ func (s *Service) Confirm(ctx context.Context, id, assignee string) (Incident, e
 	return out, nil
 }
 
+// Escalate moves a handling incident to the escalated state when the on-call
+// team needs extra authority or resources.
+func (s *Service) Escalate(ctx context.Context, id, reason string) (Incident, error) {
+	i, ok := s.store.Get(id)
+	if !ok {
+		return Incident{}, platform.NotFoundf("incident %q not found", id)
+	}
+	next, err := MustTransition(i.State, StateEscalated)
+	if err != nil {
+		return i, err
+	}
+	_, _ = s.store.Update(id, func(x *Incident) {
+		x.State = next
+		x.EscalationReason = reason
+	})
+	if s.audit != nil {
+		_ = s.audit.Record(ctx, "operator", "escalate_incident", "incident", id, reason)
+	}
+	return i, nil
+}
+
 // AddAction appends a remediation action item to an incident.
 func (s *Service) AddAction(ctx context.Context, id, description, owner string) (Incident, error) {
 	i, ok := s.store.Get(id)
@@ -201,11 +222,27 @@ func (s *Service) List(ctx context.Context) []Incident {
 	return s.store.All()
 }
 
+// ListOpen returns incidents that are still open (not closed).
+func (s *Service) ListOpen(ctx context.Context) []Incident {
+	var out []Incident
+	for _, i := range s.store.All() {
+		if i.State == StatePending || i.State == StateHandling {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 // OpenIncidentsForSegment implements permit.IncidentConflictChecker.
 func (s *Service) OpenIncidentsForSegment(segmentID string) []string {
 	var ids []string
-	for _, i := range s.store.OpenForSegment(segmentID) {
-		ids = append(ids, i.ID)
+	for _, i := range s.store.All() {
+		if i.SegmentID != segmentID {
+			continue
+		}
+		if i.State == StatePending || i.State == StateHandling {
+			ids = append(ids, i.ID)
+		}
 	}
 	return ids
 }

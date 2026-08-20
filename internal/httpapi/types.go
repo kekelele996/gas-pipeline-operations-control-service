@@ -133,10 +133,12 @@ type IncidentService interface {
 	Report(ctx context.Context, in incident.Input) (incident.Incident, error)
 	Confirm(ctx context.Context, id, assignee string) (incident.Incident, error)
 	AddAction(ctx context.Context, id, description, owner string) (incident.Incident, error)
+	Escalate(ctx context.Context, id, reason string) (incident.Incident, error)
 	CompleteAction(ctx context.Context, id, actionID string) (incident.Incident, error)
 	Close(ctx context.Context, id string) (incident.Incident, error)
 	Get(ctx context.Context, id string) (incident.Incident, error)
 	List(ctx context.Context) []incident.Incident
+	ListOpen(ctx context.Context) []incident.Incident
 	OpenCount(ctx context.Context) int
 }
 

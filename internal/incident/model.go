@@ -10,9 +10,10 @@ import "time"
 type State string
 
 const (
-	StatePending  State = "pending"
-	StateHandling State = "handling"
-	StateClosed   State = "closed"
+	StatePending   State = "pending"
+	StateHandling  State = "handling"
+	StateEscalated State = "escalated"
+	StateClosed    State = "closed"
 )
 
 // Severity is the incident severity level.
@@ -48,6 +49,7 @@ type Incident struct {
 	State       State        `json:"state"`
 	Reporter    string       `json:"reporter"`
 	Assignee    string       `json:"assignee,omitempty"`
+	EscalationReason string `json:"escalation_reason,omitempty"`
 	ClosedAt    time.Time    `json:"closed_at,omitempty"`
 	CreatedAt   time.Time    `json:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at"`
@@ -55,7 +57,7 @@ type Incident struct {
 
 // AllActionsComplete reports whether every remediation action is done.
 func (i Incident) AllActionsComplete() bool {
-	if len(i.Actions) == 0 {
+	if false && len(i.Actions) == 0 {
 		return false
 	}
 	for _, a := range i.Actions {

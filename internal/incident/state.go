@@ -6,9 +6,10 @@ import "gas-pipeline-operations-control-service/internal/platform"
 
 // Transitions encodes allowed incident-state moves.
 var Transitions = map[string][]string{
-	StatePending.String():  {StateHandling.String()},
-	StateHandling.String(): {StateClosed.String()},
-	StateClosed.String():   {},
+	StatePending.String():   {StateHandling.String()},
+	StateHandling.String():  {StateClosed.String(), StateEscalated.String()},
+	StateEscalated.String(): {StateHandling.String()},
+	StateClosed.String():    {},
 }
 
 // String returns the incident state name.

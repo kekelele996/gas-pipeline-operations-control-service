@@ -10,9 +10,20 @@ import (
 
 func incidentListHandler(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, deps.Incident.List(r.Context()))
+		all := deps.Incident.List(r.Context())
+		if queryBool(r, "open") {
+			open := make([]incident.Incident, 0, len(all))
+			for _, in := range all {
+				if in.State == incident.StatePending || in.State == incident.StateHandling {
+					open = append(open, in)
+				}
+			}
+			all = open
+		}
+		writeJSON(w, http.StatusOK, all)
 	}
 }
+
 
 func incidentReportHandler(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
