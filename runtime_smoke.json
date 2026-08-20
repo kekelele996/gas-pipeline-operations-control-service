@@ -1,0 +1,28 @@
+{
+  "mode": "service",
+  "start": "go run ./cmd/server",
+  "ready_url": "/health",
+  "port": 18090,
+  "endpoints": [
+    { "method": "GET", "path": "/health" },
+    { "method": "GET", "path": "/api/summary" },
+    { "method": "GET", "path": "/api/segments" },
+    { "method": "GET", "path": "/api/stations" },
+    { "method": "GET", "path": "/api/compressors" },
+    { "method": "GET", "path": "/api/valves" },
+    { "method": "GET", "path": "/api/points" },
+    { "method": "POST", "path": "/api/telemetry" },
+    { "method": "GET", "path": "/api/alarms" },
+    { "method": "GET", "path": "/api/metering/meters" },
+    { "method": "POST", "path": "/api/metering/readings" },
+    { "method": "POST", "path": "/api/metering/settle" },
+    { "method": "GET", "path": "/api/contracts" },
+    { "method": "POST", "path": "/api/nominations" },
+    { "method": "GET", "path": "/api/permits" },
+    { "method": "GET", "path": "/api/orders" },
+    { "method": "GET", "path": "/api/incidents" },
+    { "method": "GET", "path": "/api/leaks/analyze/{segmentId}" },
+    { "method": "GET", "path": "/api/audit" },
+    { "method": "GET", "path": "/api/notifications" }
+  ]
+}

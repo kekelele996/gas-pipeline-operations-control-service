@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>天然气长输管网运行控制看板</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⛽</span>
+      <div>
+        <h1>天然气长输管网运行控制服务</h1>
+        <p class="subtitle">Gas Pipeline Operations Control — <span id="site">GPL-CC-01</span></p>
+      </div>
+    </div>
+    <div class="status">
+      <span id="health-dot" class="dot dot-unknown"></span>
+      <span id="health-text">连接中…</span>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <section class="card grid-summary">
+      <h2>管网概览</h2>
+      <div class="kpi-grid" id="network-kpis">
+        <div class="kpi"><span class="kpi-val" id="kpi-segments">—</span><span class="kpi-label">管段</span></div>
+        <div class="kpi"><span class="kpi-val" id="kpi-stations">—</span><span class="kpi-label">站场</span></div>
+        <div class="kpi"><span class="kpi-val" id="kpi-compressors">—</span><span class="kpi-label">压缩机</span></div>
+        <div class="kpi"><span class="kpi-val" id="kpi-valves">—</span><span class="kpi-label">阀门</span></div>
+        <div class="kpi"><span class="kpi-val" id="kpi-points">—</span><span class="kpi-label">测点</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>SCADA 遥测</h2>
+      <div class="kpi-grid">
+        <div class="kpi"><span class="kpi-val" id="kpi-readings">—</span><span class="kpi-label">读数</span></div>
+        <div class="kpi"><span class="kpi-val" id="kpi-alarms">—</span><span class="kpi-label">告警总数</span></div>
+        <div class="kpi"><span class="kpi-val alert" id="kpi-active-alarms">—</span><span class="kpi-label">活动告警</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>贸易计量</h2>
+      <div class="kpi-grid">
+        <div class="kpi"><span class="kpi-val" id="kpi-meters">—</span><span class="kpi-label">计量点</span></div>
+        <div class="kpi"><span class="kpi-val" id="kpi-today-total">—</span><span class="kpi-label">当日标方</span></div>
+        <div class="kpi"><span class="kpi-val" id="kpi-settlements">—</span><span class="kpi-label">结算单</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>运行状态</h2>
+      <ul class="status-list">
+        <li><span>未关闭事件</span><b id="kpi-incidents">—</b></li>
+        <li><span>进行中许可</span><b id="kpi-permits">—</b></li>
+        <li><span>活动调度指令</span><b id="kpi-orders">—</b></li>
+        <li><span>待推送通知</span><b id="kpi-notifications">—</b></li>
+      </ul>
+    </section>
+
+    <section class="card card-wide">
+      <h2>原始摘要数据</h2>
+      <pre id="raw-summary">（等待数据）</pre>
+    </section>
+  </main>
+
+  <footer>
+    <p>生成时间 <span id="generated-at">—</span> · 自动每 5 秒刷新</p>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
