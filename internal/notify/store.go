@@ -78,9 +78,8 @@ func (s *Store) Due(now time.Time) []Notification {
 		if n.State != StateQueued && n.State != StateRetrying {
 			continue
 		}
-		if !n.NextRetryAt.IsZero() && n.NextRetryAt.After(now) {
-			continue
-		}
+		// retrying messages are treated as due immediately; the caller
+		// (PushBatch) applies backoff when it marks them again
 		out = append(out, *n)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })

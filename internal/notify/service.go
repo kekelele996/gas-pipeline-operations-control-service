@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -82,44 +83,86 @@ func (s *Service) Enqueue(ctx context.Context, recipient string, ch Channel, sub
 	return out, nil
 }
 
-// PushBatch attempts delivery of all due notifications. Each delivery succeeds
-// or fails (simulated against the configured failure rate); failed messages
-// that have remaining attempts move to retrying, otherwise to failed terminal.
-// Returns the number sent and the number that failed this batch.
+// PushBatch attempts delivery of all due notifications concurrently. Each
+// delivery succeeds or fails (simulated against the configured failure rate);
+// failed messages that have remaining attempts move to retrying, otherwise to
+// failed terminal. Returns the number sent and the number that failed.
 func (s *Service) PushBatch(ctx context.Context) (sent, failed int, err error) {
 	due := s.store.Due(s.clock.Now())
-	for _, n := range due {
-		ok := s.simulateSend()
-		if ok {
-			s.store.Update(n.ID, func(x *Notification) {
-				x.State = StateSent
-				x.Attempt++
-				x.SentAt = s.clock.Now()
-			})
-			sent++
-			continue
+	if len(due) == 0 {
+		return 0, 0, nil
+	}
+	const workers = 4
+	jobs := make(chan Notification)
+	errCh := make(chan error, len(due))
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		go func() {
+			<-start
+			time.Sleep(2 * time.Millisecond)
+			wg.Add(1)
+			defer wg.Done()
+			for n := range jobs {
+				errCh <- s.deliver(n)
+			}
+		}()
+	}
+	// producer feeds jobs to the workers
+	go func() {
+		for _, n := range due {
+			if ctx.Err() != nil {
+				return
+			}
+			jobs <- n
 		}
-		// failure path
-		attempt := n.Attempt + 1
-		if attempt >= n.MaxAttempts {
-			s.store.Update(n.ID, func(x *Notification) {
-				x.State = StateFailed
-				x.Attempt = attempt
-				x.LastError = "delivery failed (max attempts reached)"
-			})
+		close(jobs)
+	}()
+	close(start)
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-ctx.Done():
+		return sent, failed, ctx.Err()
+	case <-done:
+	}
+	close(errCh)
+	for e := range errCh {
+		if e != nil {
 			failed++
-			continue
+		} else {
+			sent++
 		}
-		backoff := s.backoff(attempt)
-		s.store.Update(n.ID, func(x *Notification) {
-			x.State = StateRetrying
-			x.Attempt = attempt
-			x.NextRetryAt = s.clock.Now().Add(backoff)
-			x.LastError = "delivery failed (simulated)"
-		})
-		failed++
 	}
 	return sent, failed, nil
+}
+
+// deliver attempts a single notification and updates its state. It returns a
+// non-nil error when the delivery did not succeed.
+func (s *Service) deliver(n Notification) error {
+	if s.simulateSend() {
+		s.store.Update(n.ID, func(x *Notification) {
+			x.State = StateSent
+			x.Attempt++
+			x.SentAt = s.clock.Now()
+		})
+		return nil
+	}
+	attempt := n.Attempt + 1
+	if attempt >= n.MaxAttempts {
+		return fmt.Errorf("delivery failed (max attempts reached)")
+	}
+	backoff := s.backoff(attempt)
+	s.store.Update(n.ID, func(x *Notification) {
+		x.State = StateRetrying
+		x.Attempt = attempt
+		x.NextRetryAt = s.clock.Now().Add(backoff)
+		x.LastError = "delivery failed (simulated)"
+	})
+	return fmt.Errorf("delivery failed (simulated)")
 }
 
 // RetryFailed forces all failed-terminal notifications back into retrying
