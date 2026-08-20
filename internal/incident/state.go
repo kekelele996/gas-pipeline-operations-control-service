@@ -8,7 +8,7 @@ import "gas-pipeline-operations-control-service/internal/platform"
 var Transitions = map[string][]string{
 	StatePending.String():   {StateHandling.String()},
 	StateHandling.String():  {StateClosed.String(), StateEscalated.String()},
-	StateEscalated.String(): {StateHandling.String()},
+	StateEscalated.String(): {StateHandling.String(), StateClosed.String()},
 	StateClosed.String():    {},
 }
 

@@ -121,14 +121,14 @@ func (s *Service) Escalate(ctx context.Context, id, reason string) (Incident, er
 	if err != nil {
 		return i, err
 	}
-	_, _ = s.store.Update(id, func(x *Incident) {
+	out, _ := s.store.Update(id, func(x *Incident) {
 		x.State = next
 		x.EscalationReason = reason
 	})
 	if s.audit != nil {
 		_ = s.audit.Record(ctx, "operator", "escalate_incident", "incident", id, reason)
 	}
-	return i, nil
+	return out, nil
 }
 
 // AddAction appends a remediation action item to an incident.
@@ -226,7 +226,7 @@ func (s *Service) List(ctx context.Context) []Incident {
 func (s *Service) ListOpen(ctx context.Context) []Incident {
 	var out []Incident
 	for _, i := range s.store.All() {
-		if i.State == StatePending || i.State == StateHandling {
+		if i.State != StateClosed {
 			out = append(out, i)
 		}
 	}
@@ -236,13 +236,8 @@ func (s *Service) ListOpen(ctx context.Context) []Incident {
 // OpenIncidentsForSegment implements permit.IncidentConflictChecker.
 func (s *Service) OpenIncidentsForSegment(segmentID string) []string {
 	var ids []string
-	for _, i := range s.store.All() {
-		if i.SegmentID != segmentID {
-			continue
-		}
-		if i.State == StatePending || i.State == StateHandling {
-			ids = append(ids, i.ID)
-		}
+	for _, i := range s.store.OpenForSegment(segmentID) {
+		ids = append(ids, i.ID)
 	}
 	return ids
 }

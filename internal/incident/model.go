@@ -57,7 +57,7 @@ type Incident struct {
 
 // AllActionsComplete reports whether every remediation action is done.
 func (i Incident) AllActionsComplete() bool {
-	if false && len(i.Actions) == 0 {
+	if len(i.Actions) == 0 {
 		return false
 	}
 	for _, a := range i.Actions {
