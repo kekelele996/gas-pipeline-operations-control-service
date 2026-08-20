@@ -100,15 +100,16 @@ func FormatEntry(e Entry) string {
 		e.Ts.Format(time.RFC3339), e.Actor, e.Action, e.TargetType, e.TargetID, e.Detail, result)
 }
 
-// Recent returns the newest n entries. The returned slice may share storage
-// with the log; callers must not mutate it.
+// Recent returns the newest n entries as an independent copy.
 func (s *Service) Recent(ctx context.Context, n int) []Entry {
-	all := s.store.entries
+	all := s.store.All()
 	if n <= 0 || len(all) == 0 {
 		return nil
 	}
 	if len(all) > n {
 		all = all[len(all)-n:]
 	}
-	return all
+	out := make([]Entry, len(all))
+	copy(out, all)
+	return out
 }
